@@ -64,6 +64,7 @@ services:
       dockerfile: docker/Dockerfile.containerd
       args:
         - TZ=${TZ:-UTC}
+        - INSTALL_OPENVIKING=${INSTALL_OPENVIKING:-0}
     container_name: memoh-containerd
     privileged: true
     pid: host

@@ -51,10 +51,25 @@ RUN apk add --no-cache python3 py3-pip && \
 
 # OpenViking context database (optional, enabled per-bot)
 # Needs build toolchain: Go+make for AGFS server, gcc/g++/cmake for pybind11 C++ extensions
-RUN apk add --no-cache --virtual .ov-build-deps \
-        go make gcc g++ musl-dev python3-dev cmake git && \
-    pip install --break-system-packages openviking && \
-    apk del .ov-build-deps
+# tree-sitter-dev provides tree_sitter/parser.h required by tree-sitter-* wheels
+ARG INSTALL_OPENVIKING=0
+RUN if [ "${INSTALL_OPENVIKING}" = "1" ]; then \
+        ALPINE_VER="$(cut -d. -f1,2 /etc/alpine-release)" && \
+        grep -q "/v${ALPINE_VER}/community" /etc/apk/repositories || \
+        echo "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER}/community" >> /etc/apk/repositories && \
+        apk add --no-cache --virtual .ov-build-deps \
+            go make gcc g++ musl-dev python3-dev cmake git py3-pip tree-sitter tree-sitter-dev && \
+        if [ -f /usr/include/tree_sitter/api.h ] && [ ! -f /usr/include/tree_sitter/parser.h ]; then \
+            printf '#include \"api.h\"\\n' > /usr/include/tree_sitter/parser.h; \
+        fi && \
+        CFLAGS="-I/usr/include -I/usr/local/include" CPPFLAGS="-I/usr/include -I/usr/local/include" \
+        pip3 install --no-cache-dir --break-system-packages openviking && \
+        apk del .ov-build-deps; \
+    else \
+        echo "Skipping OpenViking install (INSTALL_OPENVIKING=0)"; \
+    fi
+
+
 
 COPY --from=mcp-builder /out/mcp /opt/mcp
 COPY cmd/mcp/template /opt/mcp-template
